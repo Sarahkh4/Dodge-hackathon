@@ -1,47 +1,52 @@
-from faker import Faker
 import sqlite3
-import random
+from faker import Faker
 
-fake = Faker()
-conn = sqlite3.connect("tax_data.db")
-cursor = conn.cursor()
+# Create the database and table
+def create_database():
+    conn = sqlite3.connect("form_data.db")
+    cursor = conn.cursor()
 
+    # Create table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            unique_id TEXT PRIMARY KEY,
+            full_name TEXT,
+            phone_number TEXT,
+            street_address TEXT,
+            city TEXT,
+            state TEXT,
+            postal_code TEXT,
+            country TEXT
+        )
+    ''')
+    
+    # Insert sample data using Faker
+    fake = Faker()
+    sample_data = [
+        (
+            f"UID{i:03d}",
+            fake.name(),
+            fake.phone_number(),
+            fake.address().split("\n")[0],
+            fake.city(),
+            fake.state(),
+            fake.zipcode(),
+            fake.country()
+        )
+        for i in range(1, 6)  # Generate 5 sample records
+    ]
 
-cursor.executescript("""
-CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT,
-    email TEXT UNIQUE,
-    ssn TEXT UNIQUE,
-    address TEXT
-);
+    cursor.executemany('''
+        INSERT OR IGNORE INTO users (
+            unique_id, full_name, phone_number, street_address,
+            city, state, postal_code, country
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    ''', sample_data)
 
-CREATE TABLE IF NOT EXISTS tax_records (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER,
-    year INTEGER,
-    income REAL,
-    deductions REAL,
-    tax_paid REAL,
-    FOREIGN KEY(user_id) REFERENCES users(id)
-);
-""")
+    conn.commit()
+    conn.close()
+    print("Database created and sample data added!")
 
-for _ in range(10):
-    name = fake.name()
-    email = fake.email()
-    ssn = fake.ssn()
-    address = fake.address()
-    cursor.execute("INSERT INTO users (name, email, ssn, address) VALUES (?, ?, ?, ?)",
-                   (name, email, ssn, address))
-    user_id = cursor.lastrowid
-    for year in range(2020, 2023):
-        income = round(random.uniform(30000, 100000), 2)
-        deductions = round(random.uniform(5000, 20000), 2)
-        tax_paid = income * 0.2 - deductions  
-        cursor.execute("INSERT INTO tax_records (user_id, year, income, deductions, tax_paid) VALUES (?, ?, ?, ?, ?)",
-                       (user_id, year, income, deductions, tax_paid))
-
-conn.commit()
-conn.close()
-print("Database populated with mock data.")
+# Run the function to create database
+if __name__ == "__main__":
+    create_database()
