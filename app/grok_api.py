@@ -1,16 +1,25 @@
 import os
+from dotenv import load_dotenv  # Import load_dotenv to load .env file
 from openai import OpenAI
 import re
-# Initialize Grok client
-# XAI_API_KEY = os.getenv("XAI_API_KEY")
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Retrieve API key from .env file
+XAI_API_KEY = os.getenv("XAI_API_KEY")  # This should match the variable name in your .env file
 
 class GrokAPI:
     def __init__(self):
+        # Check if API key is loaded successfully
+        if not XAI_API_KEY:
+            raise ValueError("API key not found. Make sure it is set in the .env file.")
+
+        # Initialize OpenAI client
         self.client = OpenAI(
-            api_key="YOUR_API_KEY",
+            api_key=XAI_API_KEY,
             base_url="https://api.x.ai/v1",
         )
-
     
 
 
