@@ -1,6 +1,10 @@
 import sqlite3
 from faker import Faker
 
+# Function to format phone numbers in (XXX) XXX-XXXX format
+def generate_us_phone_number():
+    return f"{fake.numerify('###')}-{fake.numerify('###')}-{fake.numerify('####')}"
+
 # Create the database and table
 def create_database():
     conn = sqlite3.connect("form_data.db")
@@ -20,22 +24,26 @@ def create_database():
         )
     ''')
     
-    # Insert sample data using Faker
-    fake = Faker()
+    # Initialize Faker with USA locale
+    global fake
+    fake = Faker("en_US")
+
+    # Generate sample data
     sample_data = [
         (
             f"UID{i:03d}",
             fake.name(),
-            fake.phone_number(),
-            fake.address().split("\n")[0],
+            generate_us_phone_number(),  # Enforce USA phone format
+            fake.street_address(),
             fake.city(),
-            fake.state(),
+            fake.state_abbr(),  # Use state abbreviation
             fake.zipcode(),
-            fake.country()
+            "United States"
         )
         for i in range(1, 6)  # Generate 5 sample records
     ]
 
+    # Insert data into the table
     cursor.executemany('''
         INSERT OR IGNORE INTO users (
             unique_id, full_name, phone_number, street_address,

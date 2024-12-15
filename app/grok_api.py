@@ -1,18 +1,19 @@
 import os
 from openai import OpenAI
 import re
+from dotenv import load_dotenv
+
+load_dotenv()
+
 # Initialize Grok client
-# XAI_API_KEY = os.getenv("XAI_API_KEY")
+XAI_API_KEY = os.getenv("XAI_API_KEY")
 
 class GrokAPI:
     def __init__(self):
         self.client = OpenAI(
-            api_key="YOUR_API_KEY",
+            api_key=XAI_API_KEY,
             base_url="https://api.x.ai/v1",
         )
-
-    
-
 
     def validate_and_fill_form(self, form_data):
         """
@@ -22,22 +23,27 @@ class GrokAPI:
         :return: Dictionary with missing or invalid form fields or error message
         """
         try:
+            # Identify missing fields (fields with empty values)
             missing_fields = [key for key, value in form_data.items() if not value]
+            
+            # Identify invalid fields (fields that have incorrect values based on their formats)
             invalid_fields = self._check_for_invalid_formats(form_data)
 
-            # Return early if any fields are missing or invalid
+            # Return early if no missing or invalid fields
             if not missing_fields and not invalid_fields:
                 return {"message": "All fields are valid and complete."}
 
+            # Prepare user message only for missing and invalid fields
             user_message = (
                 f"Here is the tax form data: {form_data}. "
-                f"Identify missing or invalid fields and suggest appropriate values. "
+                f"Identify missing fields and their values or suggest corrections for invalid fields. "
                 f"Missing fields: {missing_fields}, Invalid fields: {invalid_fields}."
             )
 
+            # Get the response from Grok
             completion = self.client.chat.completions.create(
                 model="grok-beta",
-                messages=[
+                messages=[ 
                     {
                         "role": "system",
                         "content": (
@@ -50,12 +56,17 @@ class GrokAPI:
                 ],
             )
 
+            # Get the raw response text from Grok's completion
             raw_response = completion.choices[0].message.content
 
-            # Attempt to parse the response for missing or invalid fields
+            # If Grok's response is just a success message (with no corrections), return the form data
+            if "All fields are valid and complete" in raw_response:
+                return form_data
+
+            # Parse the response into a dictionary with field values
             filled_form = self._parse_response_to_dict(raw_response, form_data, missing_fields, invalid_fields)
 
-            # Filter out only the missing or invalid fields
+            # Filter out only the missing or invalid fields to return
             result = {}
             for field in missing_fields + invalid_fields:
                 result[field] = filled_form.get(field, "No value provided")
@@ -120,8 +131,6 @@ class GrokAPI:
             if not re.match(country_pattern, form_data['country']):
                 invalid_fields.append('country')
 
-        # Add any other custom field validations here
-
         return invalid_fields
 
     def _parse_response_to_dict(self, response_text, original_form, missing_fields, invalid_fields):
@@ -145,24 +154,16 @@ class GrokAPI:
             if match:
                 extracted_data[field] = match.group(1).strip()
             else:
-                # If no value is found, keep the original value
+                # If no value is found, keep the original value (or leave empty if missing)
                 extracted_data[field] = original_form.get(field, "")
 
-            # Handle missing fields
-            if not extracted_data[field]:
-                if field in missing_fields:
-                    extracted_data[field] = f"Missing {field}"
+            # Handle missing fields - explicitly mark them
+            if not extracted_data[field] and field in missing_fields:
+                extracted_data[field] = f"Missing {field}"
 
-            # Handle invalid formats
-            if field in invalid_fields:
+            # Handle invalid formats - explicitly mark them
+            if field in invalid_fields and not extracted_data[field]:
                 extracted_data[field] = f"Invalid {field} format"
-
-            # Ensure that the country field is handled correctly (not defaulting to 'United States')
-            if field == 'country' and not extracted_data[field]:
-                if 'country' in missing_fields:
-                    extracted_data[field] = "Missing country"
-                else:
-                    extracted_data[field] = original_form.get(field, "Country information not available")
 
         return extracted_data
 
@@ -176,8 +177,3 @@ class GrokAPI:
         sanitized_text = re.sub(r"\*\*", "", response_text)  # Remove asterisks
         sanitized_text = sanitized_text.strip()  # Remove leading/trailing spaces
         return sanitized_text
-
-
-
-
-

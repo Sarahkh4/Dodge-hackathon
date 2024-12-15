@@ -1,11 +1,11 @@
 import sqlite3
 import streamlit as st
-from grok_api import GrokAPI
+from grok_api import GrokAPI  # Assuming this is where you imported your Grok API class
 
-# Initialize GrokAPI client
+# Initialize Grok API client
 grok_client = GrokAPI()
 
-# Function to fetch user data by unique_id
+# Function to fetch user data by unique ID
 def get_user_data(unique_id):
     conn = sqlite3.connect("form_data.db")
     cursor = conn.cursor()
@@ -16,6 +16,9 @@ def get_user_data(unique_id):
 
 # Streamlit app
 st.title("Smart Form Auto-Filler and Validator")
+
+# User input for unique ID
+unique_id = st.text_input("Enter Unique ID:")
 
 # Initialize form fields as empty
 form_data = {
@@ -28,15 +31,12 @@ form_data = {
     "country": ""
 }
 
-# User input for unique ID
-unique_id = st.text_input("Enter Unique ID:")
-
+# If Unique ID is provided, fetch data from the database
 if unique_id:
-    # Fetch data from the database
     user_data = get_user_data(unique_id)
 
     if user_data:
-        # Populate form_data with the retrieved user data
+        # Populate form data with the retrieved user data
         form_data["full_name"] = user_data[1]
         form_data["phone_number"] = user_data[2]
         form_data["street_address"] = user_data[3]
@@ -59,14 +59,22 @@ form_data["country"] = st.text_input("Country", value=form_data["country"])
 
 # Submit button
 if st.button("Submit"):
-    # Use Grok API to validate and auto-fill form
+    # Call the Grok API to validate and fill the form
     response = grok_client.validate_and_fill_form(form_data)
 
-    # Handle response and display it
+    # Handle response and display errors or success message
     if "error" in response:
         st.error(f"Error: {response['error']}")
     else:
-        # Display validated and auto-filled form data
-        st.success("Form successfully validated and auto-filled!")
+        # Check if any fields are missing or invalid
+        error_found = False
         for field, value in response.items():
-            st.write(f"{field}: {value}")
+            if "Missing" in value or "Invalid" in value:
+                st.error(f"Error: {field} - {value}")
+                error_found = True
+
+        if not error_found:
+            # If no errors, show success message and the filled form
+            st.success("Form successfully validated and auto-filled!")
+            for field, value in response.items():
+                st.write(f"{field}: {value}")
